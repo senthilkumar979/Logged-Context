@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { createLoggedStore } from '../lib/devtools/createLoggedStore';
 
 export interface UseReducerWithDevToolsOptions {
@@ -15,15 +15,10 @@ export function useReducerWithDevTools<TState, TAction>(
   options: UseReducerWithDevToolsOptions,
 ): [TState, (action: TAction) => void] {
   const { name } = options;
-  const storeRef = useRef<ReturnType<
-    typeof createLoggedStore<TState, TAction>
-  > | null>(null);
 
-  if (storeRef.current === null) {
-    storeRef.current = createLoggedStore({ name, reducer, initialState });
-  }
-
-  const store = storeRef.current;
+  const [store] = useState(() =>
+    createLoggedStore({ name, reducer, initialState }),
+  );
 
   useEffect(() => () => store.destroy(), [store]);
 

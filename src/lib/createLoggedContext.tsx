@@ -2,8 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
-  useMemo,
-  useRef,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
@@ -33,11 +32,9 @@ export function createLoggedContext<TState, TAction>(
   const StoreContext = createContext<LoggedStore<TState, TAction> | null>(null);
 
   const Provider = ({ children }: { children: ReactNode }) => {
-    const storeRef = useRef<LoggedStore<TState, TAction> | null>(null);
-    if (storeRef.current === null) {
-      storeRef.current = createLoggedStore({ name, reducer, initialState });
-    }
-    const store = storeRef.current;
+    const [store] = useState(() =>
+      createLoggedStore({ name, reducer, initialState }),
+    );
 
     useEffect(() => () => store.destroy(), [store]);
 
@@ -63,25 +60,22 @@ export function createLoggedContext<TState, TAction>(
     isEqual: EqualityFn<TSelected> = Object.is,
   ): TSelected {
     const store = useStoreApi();
-    const selectorRef = useRef(selector);
-    const isEqualRef = useRef(isEqual);
-    const selectedRef = useRef<TSelected>(selector(store.getState()));
+    const state = useSyncExternalStore(
+      store.subscribe,
+      store.getState,
+      store.getState,
+    );
 
-    selectorRef.current = selector;
-    isEqualRef.current = isEqual;
+    const selected = selector(state);
+    const [cached, setCached] = useState(selected);
 
-    const subscribe = useMemo(() => store.subscribe, [store]);
+    // React-allowed: adjust derived state during render (no refs).
+    if (!isEqual(cached, selected)) {
+      setCached(selected);
+      return selected;
+    }
 
-    const getSnapshot = () => {
-      const nextSelected = selectorRef.current(store.getState());
-      if (isEqualRef.current(selectedRef.current, nextSelected)) {
-        return selectedRef.current;
-      }
-      selectedRef.current = nextSelected;
-      return nextSelected;
-    };
-
-    return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    return cached;
   }
 
   /** Full state + dispatch when you do not need a fine-grained selector. */
