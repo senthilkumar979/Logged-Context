@@ -20,7 +20,12 @@ export function useReducerWithDevTools<TState, TAction>(
     createLoggedStore({ name, reducer, initialState }),
   );
 
-  useEffect(() => () => store.destroy(), [store]);
+  useEffect(() => {
+    store.connectViewer();
+    return () => {
+      store.disconnectViewer();
+    };
+  }, [store]);
 
   const state = useSyncExternalStore(
     store.subscribe,

@@ -36,7 +36,12 @@ export function createLoggedContext<TState, TAction>(
       createLoggedStore({ name, reducer, initialState }),
     );
 
-    useEffect(() => () => store.destroy(), [store]);
+    useEffect(() => {
+      store.connectViewer();
+      return () => {
+        store.disconnectViewer();
+      };
+    }, [store]);
 
     return (
       <StoreContext.Provider value={store}>{children}</StoreContext.Provider>

@@ -16,6 +16,10 @@ export interface LoggedStore<TState, TAction> {
   getState: () => TState;
   dispatch: (action: TAction) => void;
   subscribe: (listener: () => void) => () => void;
+  /** Connect console/DevTools viewer (call from useEffect setup). */
+  connectViewer: () => void;
+  /** Disconnect viewer (call from useEffect cleanup — Safe with Strict Mode). */
+  disconnectViewer: () => void;
   destroy: () => void;
 }
 
@@ -61,7 +65,6 @@ export function createLoggedStore<TState, TAction>(
     const prevState = state;
     const nextState = reducer(prevState, action);
 
-    // Console + DevTools only in local/dev builds (stripped behavior in production).
     if (isDev) {
       logContextAction({ name, action, prevState, nextState });
       connection?.send(toDevToolsAction(action), nextState);
@@ -77,19 +80,11 @@ export function createLoggedStore<TState, TAction>(
     };
   }
 
-  function destroy(): void {
-    if (isDev) {
-      unsubscribeDevTools?.();
-      unsubscribeDevTools = null;
-      connection?.disconnect();
-      connection = null;
-    }
-    listeners.clear();
-  }
+  function connectViewer(): void {
+    if (!isDev || connection) return;
 
-  if (isDev) {
     connection = connectDevTools(name);
-    connection.init(initialState);
+    connection.init(state);
 
     unsubscribeDevTools = connection.subscribe((message) => {
       if (!isTimeTravelMessage(message)) return;
@@ -107,10 +102,26 @@ export function createLoggedStore<TState, TAction>(
     });
   }
 
+  function disconnectViewer(): void {
+    if (!isDev) return;
+
+    unsubscribeDevTools?.();
+    unsubscribeDevTools = null;
+    connection?.disconnect();
+    connection = null;
+  }
+
+  function destroy(): void {
+    disconnectViewer();
+    listeners.clear();
+  }
+
   return {
     getState,
     dispatch,
     subscribe,
+    connectViewer,
+    disconnectViewer,
     destroy,
   };
 }
